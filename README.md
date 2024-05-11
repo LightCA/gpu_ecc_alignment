@@ -37,3 +37,11 @@ On **1920x2560** (rowsxcols) image resolution:
 Order of magnitude (x10~) speed-up !!
 
 Expect better speed-up with better GPU and harder alignment cases (bad alignment initilization, more iterations, small epsilon).
+
+# Instructions
+mkdir build && cd build
+cmake ..
+make
+# you might need to get an image (instead of fruits.jpg) into the build folder if opencv can't find the input image (should be obtained automatically from opencv installation directory)
+./ecc_gpu fruits.jpg -o=outWarp.ecc -m=homography -e=1e-6 -N=70 -v=1
+
