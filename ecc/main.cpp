@@ -146,7 +146,7 @@ static void draw_warped_roi(Mat& image, const int width, const int height, Mat& 
 int main(const int argc, const char * argv[])
 {
 
-		///////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////./ecc_gpu fruits.jpg -o=outWarp.ecc -m=homography -e=1e-6 -N=70 -v=1///////////////////
 	// if target_image (the image to warp towards) is not given we resize inputImage into target_image
 	// then, we warp the target_image and save it on template_image.
 	// this way we can later test gpu and cpu when using findTransformECCGpu
