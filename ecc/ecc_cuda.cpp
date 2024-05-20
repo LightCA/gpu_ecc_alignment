@@ -112,6 +112,16 @@ void meanStdDev_32FC1M(cv::cuda::GpuMat src, cv::cuda::GpuMat mask, double *mean
 	NppiSize sz;
 	sz.width = src.cols;
 	sz.height = src.rows;
+    // NppStatus status = nppiMean_StdDev_32f_C1MR(
+    //     src.ptr<Npp32f>(),             // Source image
+    //     static_cast<int>(src.step),    // Step size of the source image
+    //     mask.ptr<Npp8u>(),             // Mask image
+    //     static_cast<int>(mask.step),   // Step size of the mask image
+    //     sz,                            // Size of the region of interest
+    //     buffers.meanStdDevBuf,         // Temporary buffer for the operation
+    //     buffers.mean_dev,              // Pointer to mean value
+    //     buffers.stddev_dev             // Pointer to standard deviation value
+    // );
 	nppiMean_StdDev_32f_C1MR(src.ptr<Npp32f>(), static_cast<int>(src.step), mask.ptr<Npp8u>(), static_cast<int>(mask.step), sz, buffers.meanStdDevBuf, buffers.mean_dev, buffers.stddev_dev);
 
 	cudaMemcpy(mean, buffers.mean_dev, sizeof(double), cudaMemcpyDeviceToHost);
@@ -195,13 +205,11 @@ static void image_jacobian_euclidean_ECC_cuda(const Mat& src5, ECC_GPU_Buffers& 
 
 	const int w = gpuEccBuffers.src1.cols;
 
-
 	//create -sin(theta)*X -cos(theta)*Y for all points as a block -> hatX
 	cuda::addWeighted(gpuEccBuffers.src3, -h1, gpuEccBuffers.src4, -h0, 0.0, gpuEccBuffers.hatX_, CV_32F, gpuEccBuffers.stream);
 
 	//create cos(theta)*X -sin(theta)*Y for all points as a block -> hatY
 	cuda::addWeighted(gpuEccBuffers.src3, h0, gpuEccBuffers.src4, -h1, 0.0, gpuEccBuffers.hatY_, CV_32F, gpuEccBuffers.stream);
-
 
 	//compute Jacobian blocks (3 blocks)
 	cuda::multiply(gpuEccBuffers.src1, gpuEccBuffers.hatX_, gpuEccBuffers.hatxsrc1, 1.0, CV_32F, gpuEccBuffers.stream);

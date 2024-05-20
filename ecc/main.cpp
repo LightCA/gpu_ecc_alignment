@@ -44,7 +44,7 @@ const std::string keys =
 "{n numOfIter    | 50            | ECC's iterations }"
 "{e epsilon      | 0.0001        | ECC's convergence epsilon }"
 "{o outputWarp   | outWarp.ecc   | output warp (matrix) filename }"
-"{m motionType   | affine        | type of motion (translation, euclidean, affine, homography) }"
+"{m motionType   | translation        | type of motion (translation, euclidean, affine, homography) }"
 "{v verbose      | 1             | display initial and final images }"
 "{w warpedImfile | warpedECC.png | warped input image }"
 "{h help | | print help message }"
@@ -145,14 +145,11 @@ static void draw_warped_roi(Mat& image, const int width, const int height, Mat& 
 }
 int main(const int argc, const char * argv[])
 {
-
-		///////////////////////////////////////////////////////////////////////////
 	// if target_image (the image to warp towards) is not given we resize inputImage into target_image
 	// then, we warp the target_image and save it on template_image.
 	// this way we can later test gpu and cpu when using findTransformECCGpu
 	// And finnaly, rewarping the template_image back to the target_image:
 	// 		warpPerspective(target_image, warped_image, warp_matrix, warped_image.size(), INTER_LINEAR + WARP_INVERSE_MAP)
-
 
 	CommandLineParser parser(argc, argv, keys);
 	parser.about("ECC demo");
@@ -206,8 +203,7 @@ int main(const int argc, const char * argv[])
 	// else: target_image (the image to warp towards) is not given so we resize inputImage into target_image
 	else { //apply random warp to input image
 
-		int out_size = 640;
-		Size out_shape(out_size, out_size);
+		Size out_shape(200, 200);
 		//resize(inputImage, target_image, Size(216, 216), 0, 0, INTER_LINEAR_EXACT);
 		// resize(inputImage, target_image, Size(2560, 1920), 0, 0, INTER_LINEAR_EXACT);
 		//resize(inputImage, inputImage, Size(1920, 2560), 0, 0, INTER_LINEAR_EXACT);
