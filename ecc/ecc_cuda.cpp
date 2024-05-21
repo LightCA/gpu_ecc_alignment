@@ -11,6 +11,8 @@
 #include "opencv2/cudawarping.hpp"
 #include "opencv2/cudabgsegm.hpp"
 #include <opencv2/cudaarithm.hpp>
+#include <iostream>
+
 /****************************************************************************************\
 *                                      Cuda Image Alignment (ECC algorithm)                  *
 \****************************************************************************************/
@@ -132,9 +134,35 @@ void dotGpuMat(cv::cuda::GpuMat m1, cv::cuda::GpuMat m2, int i, ECC_GPU_Buffers&
 {
 	NppiSize ns;
 	double *pDp_dev = &buffers.pDp_dev[i];
+
+    double temp_pDP;
+    cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
+    std::cout << "temp_pDP: " << temp_pDP << '\n';
+
 	ns.height = m1.rows;
 	ns.width = m1.cols;
+    // - pSrc1: Pointer to the first input array (vector)
+    // - src1Step: Step size of the first input array
+    // - pSrc2: Pointer to the second input array (vector)
+    // - src2Step: Step size of the second input array
+    // - roiSize: Size of the region of interest (ROI), specifying the length of the vectors
+    // - pDst: Pointer to the output array to store the dot product result
+    // - pBuffer: Temporary buffer for the operation
+    std::cout << "m1.rows << m1.cols: " << m1.rows << ';' << m1.cols << '\n';
+    std::cout << "m2.rows << m2.cols: " << m2.rows << ';' << m2.cols << '\n';
+
+    cv::Mat cpuMat1;
+    m1.download(cpuMat1);
+    cv::imshow("cpuMat1", cpuMat1);
+    cv::Mat cpuMat2;
+    m2.download(cpuMat2);
+    cv::imshow("cpuMat2", cpuMat2);
+    cv::waitKey(0);
+
 	nppiDotProd_32f64f_C1R(m1.ptr<Npp32f>(), static_cast<int>(m1.step), m2.ptr<Npp32f>(), static_cast<int>(m2.step), ns, pDp_dev, buffers.pDeviceBuffer);
+    
+    cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
+    std::cout << "temp_pDP: " << temp_pDP << '\n';
 }
 
 
@@ -270,6 +298,10 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 			dotGpuMat(src2, src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 		}
 		cudaMemcpy(dotProdDoubles.data(), eccBuffers.pDp_dev, sizeof(double)*dst.rows, cudaMemcpyDeviceToHost);
+        // for (size_t i = 0; i < dotProdDoubles.size(); ++i) {
+        //     std::cout << "dotProdDoubles[" << i << "] = " << dotProdDoubles[i] << std::endl;
+        // }
+
 		std::copy(dotProdDoubles.begin(), dotProdDoubles.end(), dstPtr);
 	}
 
@@ -285,9 +317,15 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 				dotGpuMat(src1.colRange(i*w, (i + 1)*w), src2.colRange(j*w, (j + 1)*w), i*dst.cols + j, eccBuffers);
 			}
 		}
-		cudaMemcpy(dotProdDoubles.data(), eccBuffers.pDp_dev, sizeof(double)*dst.rows*dst.cols, cudaMemcpyDeviceToHost);
-		cudaMemcpy(normDoubles.data(), eccBuffers.pNorm, sizeof(double)*dst.rows, cudaMemcpyDeviceToHost);
 
+		cudaMemcpy(dotProdDoubles.data(), eccBuffers.pDp_dev, sizeof(double)*dst.rows*dst.cols, cudaMemcpyDeviceToHost);
+        // for (size_t i = 0; i < dotProdDoubles.size(); ++i) {
+        //     std::cout << "project_onto_jacobian_ECC_cuda (else)  dotProdDoubles[" << i << "] = " << dotProdDoubles[i] << std::endl;
+        // }
+		cudaMemcpy(normDoubles.data(), eccBuffers.pNorm, sizeof(double)*dst.rows, cudaMemcpyDeviceToHost);
+        // for (size_t i = 0; i < normDoubles.size(); ++i) {
+        //     std::cout << "project_onto_jacobian_ECC_cuda (else)  normDoubles[" << i << "] = " << normDoubles[i] << std::endl;
+        // }
 		for (int i = 0; i < dst.rows; i++) {
 			dstPtr[i*(dst.rows + 1)] = normDoubles[i] * normDoubles[i]; //diagonal elements
 			for (int j = i + 1; j < dst.cols; j++) { //j starts from i+1
@@ -296,6 +334,13 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 
 			}
 		}
+        
+    // for (size_t i = 0; i < dst.rows; ++i) {
+    //     for (size_t j = 0; j < dst.cols; ++j) {
+    //     std::cout << "project_onto_jacobian_ECC_cuda (else) dst[" << i << "][" << j << "] = " << dst.at<double>(i, j) << std::endl;
+    //     }
+    // }
+        
 
 	}
 }
@@ -582,11 +627,13 @@ double findTransformECCGpu_(InputArray templateImage,
 		cuda::GpuMat& jacobianGPU = gpubuffers.dst;
         // calculate Hessian and its inverse
 		gpubuffers.stream.waitForCompletion();
+        std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n';
 		project_onto_jacobian_ECC_cuda(jacobianGPU, jacobianGPU, hessian, gpubuffers);
         hessianInv = hessian.inv();
 		double correlation;
 		dotGpuMat(gpubuffers.templateZM, gpubuffers.imageWarped,0, gpubuffers); //templateZM.dot(imageWarped);
 		cudaMemcpy(&correlation, gpubuffers.pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
+        std::cout << '\n' << "correlation: " << correlation << "\n";
 		 
         // calculate enhanced correlation coefficient (ECC)->rho
         last_rho = rho;
@@ -596,14 +643,19 @@ double findTransformECCGpu_(InputArray templateImage,
         }
 
         // project images into jacobian
+        std::cout << "project_onto_jacobian_ECC_cuda (imageProjection): " << '\n';
         project_onto_jacobian_ECC_cuda( jacobianGPU, gpubuffers.imageWarped, imageProjection, gpubuffers);
+        std::cout << "project_onto_jacobian_ECC_cuda (templateProjection): " << '\n';
         project_onto_jacobian_ECC_cuda(jacobianGPU, gpubuffers.templateZM, templateProjection, gpubuffers);
-
 
         // calculate the parameter lambda to account for illumination variation
         imageProjectionHessian = hessianInv*imageProjection;
         const double lambda_n = (imgNorm*imgNorm) - imageProjection.dot(imageProjectionHessian);
+        // std::cout << '\n' << "imgNorm: " << imgNorm << " (imgNorm*imgNorm): " << (imgNorm*imgNorm) << " imageProjectionHessian: " << imageProjectionHessian <<
+        // " imageProjection.dot(imageProjectionHessian): " << imageProjection.dot(imageProjectionHessian) << "\nlambda_n: " << lambda_n << '\n';
         const double lambda_d = correlation - templateProjection.dot(imageProjectionHessian);
+        // std::cout << "correlation: " << correlation << " imageProjectionHessian: " << imageProjectionHessian <<
+        // " imageProjection.dot(imageProjectionHessian): " << imageProjection.dot(imageProjectionHessian) << "\nlambda_d: " << lambda_d << '\n';
         if (lambda_d <= 0.0)
         {
             rho = -1;

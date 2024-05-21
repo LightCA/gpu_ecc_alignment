@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)  # CMake version check
 project(ecc_gpu)     
-# set(CMAKE_BUILD_TYPE Debug) # for vsCode debug
+set(CMAKE_BUILD_TYPE Debug) # for vsCode debug
           
 set(CMAKE_CXX_STANDARD 14)         
 find_package(OpenCV 4.5 REQUIRED )
