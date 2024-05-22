@@ -148,21 +148,18 @@ void dotGpuMat(cv::cuda::GpuMat m1, cv::cuda::GpuMat m2, int i, ECC_GPU_Buffers&
     // - roiSize: Size of the region of interest (ROI), specifying the length of the vectors
     // - pDst: Pointer to the output array to store the dot product result
     // - pBuffer: Temporary buffer for the operation
-    std::cout << "m1.rows << m1.cols: " << m1.rows << ';' << m1.cols << '\n';
-    std::cout << "m2.rows << m2.cols: " << m2.rows << ';' << m2.cols << '\n';
 
+	nppiDotProd_32f64f_C1R(m1.ptr<Npp32f>(), static_cast<int>(m1.step), m2.ptr<Npp32f>(), static_cast<int>(m2.step), ns, pDp_dev, buffers.pDeviceBuffer);
+    
+    cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
+    std::cout << "temp_pDP: " << temp_pDP << '\n';
     cv::Mat cpuMat1;
     m1.download(cpuMat1);
     cv::imshow("cpuMat1", cpuMat1);
     cv::Mat cpuMat2;
     m2.download(cpuMat2);
     cv::imshow("cpuMat2", cpuMat2);
-    cv::waitKey(0);
-
-	nppiDotProd_32f64f_C1R(m1.ptr<Npp32f>(), static_cast<int>(m1.step), m2.ptr<Npp32f>(), static_cast<int>(m2.step), ns, pDp_dev, buffers.pDeviceBuffer);
-    
-    cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "temp_pDP: " << temp_pDP << '\n';
+    // cv::waitKey(0);
 }
 
 
@@ -295,8 +292,10 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 		w = src2.cols;
 		std::vector<double> dotProdDoubles(dst.rows);
 		for (int i = 0; i < dst.rows; i++) {
+            std::cout << "project_onto_jacobian_ECC_cuda-dotGpuMat src1.cols != src2.cols" << '\n';
 			dotGpuMat(src2, src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 		}
+        
 		cudaMemcpy(dotProdDoubles.data(), eccBuffers.pDp_dev, sizeof(double)*dst.rows, cudaMemcpyDeviceToHost);
         // for (size_t i = 0; i < dotProdDoubles.size(); ++i) {
         //     std::cout << "dotProdDoubles[" << i << "] = " << dotProdDoubles[i] << std::endl;
@@ -314,6 +313,7 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 		for (int i = 0; i < dst.rows; i++) {
 			normL2GPUFloatMat(src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 			for (int j = i + 1; j < dst.cols; j++) { //j starts from i+1
+                std::cout << "project_onto_jacobian_ECC_cuda-dotGpuMat-src1.cols == src2.cols" << '\n';
 				dotGpuMat(src1.colRange(i*w, (i + 1)*w), src2.colRange(j*w, (j + 1)*w), i*dst.cols + j, eccBuffers);
 			}
 		}
@@ -370,7 +370,7 @@ static void update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, const
 
     float* mapPtr = map_matrix.ptr<float>(0);
     const float* updatePtr = update.ptr<float>(0);
-
+    std::cout << "update:\n" << update << '\n' << std::endl;
 
     if (motionType == MOTION_TRANSLATION){
         mapPtr[2] += updatePtr[0];
@@ -409,10 +409,10 @@ static void update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, const
 
 double findTransformECCGpu_(InputArray templateImage,
                             InputArray inputImage,
-                            InputOutputArray warpMatrix,
-                            int motionType,
+                            InputOutputArray warpMatrix, 
+                            int motionType,         // motion_mode
                             TermCriteria criteria,
-                            InputArray inputMask,
+                            InputArray inputMask, // empty
                             int gaussFiltSize)
 {
 
@@ -510,7 +510,7 @@ double findTransformECCGpu_(InputArray templateImage,
     Mat imageWarped   = Mat(hs, ws, CV_32F);// to store the warped zero-mean input image
     Mat imageMask     = Mat(hs, ws, CV_8U); // to store the final mask
 
-    Mat inputMaskMat = inputMask.getMat();
+    Mat inputMaskMat = inputMask.getMat(); // empty
     //to use it for mask warping
     Mat preMask;
     if(inputMask.empty())
@@ -631,6 +631,8 @@ double findTransformECCGpu_(InputArray templateImage,
 		project_onto_jacobian_ECC_cuda(jacobianGPU, jacobianGPU, hessian, gpubuffers);
         hessianInv = hessian.inv();
 		double correlation;
+
+        std::cout << "findTransformECCGpu_" << '\n';
 		dotGpuMat(gpubuffers.templateZM, gpubuffers.imageWarped,0, gpubuffers); //templateZM.dot(imageWarped);
 		cudaMemcpy(&correlation, gpubuffers.pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
         std::cout << '\n' << "correlation: " << correlation << "\n";
@@ -679,10 +681,14 @@ double findTransformECCGpu_(InputArray templateImage,
     return rho;
 }
 
-double findTransformECCGpu(InputArray templateImage, InputArray inputImage,
-    InputOutputArray warpMatrix, int motionType,
-    TermCriteria criteria, int gaussianFilterSize,
-    InputArray inputMask)
+double findTransformECCGpu(
+    InputArray templateImage,   // template_image
+    InputArray inputImage,      // target_image
+    InputOutputArray warpMatrix,// warp_matrix
+     int motionType,            // warp_mode
+    TermCriteria criteria,      // TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, number_of_iterations, termination_eps)
+    int gaussianFilterSize,     // gaussian_size
+    InputArray inputMask)       // empty
 {
     return findTransformECCGpu_(templateImage, inputImage, warpMatrix, motionType, criteria, inputMask, gaussianFilterSize);
 }

@@ -215,10 +215,13 @@ int main(const int argc, const char * argv[])
 		Mat warpGround;
 		RNG rng(getTickCount());
 		double angle;
+		int shiftX = 40;
+		int shiftY = 40;
 		switch (mode_temp) {
 		case MOTION_TRANSLATION:
-			warpGround = (Mat_<float>(2, 3) << 1, 0, (70),
-				0, 1, (40));
+			angle = 0;
+			warpGround = (Mat_<float>(2, 3) <<  cos(angle), -sin(angle), shiftX,
+												sin(angle),  cos(angle), shiftY);
 			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
 
 			//warpGround = (Mat_<float>(2, 3) << 1, 0, (rng.uniform(10.f, 20.f)),
@@ -228,8 +231,8 @@ int main(const int argc, const char * argv[])
 			break;
 		case MOTION_EUCLIDEAN:
 			angle = 0;//CV_PI*11/180.f;
-			warpGround = (Mat_<float>(2, 3) << cos(angle), -sin(angle), (70),
-				sin(angle), cos(angle), (40));
+			warpGround = (Mat_<float>(2, 3) <<  cos(angle), -sin(angle), shiftX,
+												sin(angle),  cos(angle), shiftY);
 			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
 
 			//angle = CV_PI / 30 + CV_PI*rng.uniform((double)-2.f, (double)2.f) / 180;
@@ -240,8 +243,8 @@ int main(const int argc, const char * argv[])
 			break;
 		case MOTION_AFFINE:
 			angle = 0;// CV_PI * 11 / 180.f;
-			warpGround = (Mat_<float>(2, 3) << cos(angle), -sin(angle), (70),
-				sin(angle), cos(angle), (40));
+			warpGround = (Mat_<float>(2, 3) <<  cos(angle), -sin(angle), shiftX,
+												sin(angle),  cos(angle), shiftY);
 			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
 
 			//warpGround = (Mat_<float>(2, 3) << (1 - rng.uniform(-0.05f, 0.05f)),
@@ -299,6 +302,10 @@ int main(const int argc, const char * argv[])
 	// start timing
 	int gaussian_size = 5;
 	double tic_init = (double)getTickCount();
+
+    cv::imshow("template_image", template_image);
+    cv::imshow("target_image", target_image);
+    cv::waitKey(0);
 	double cc = findTransformECCGpu(template_image, target_image, warp_matrix, warp_mode,
 		TermCriteria(TermCriteria::COUNT + TermCriteria::EPS,
 			number_of_iterations, termination_eps), gaussian_size);
