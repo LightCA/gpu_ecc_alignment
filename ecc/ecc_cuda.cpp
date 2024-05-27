@@ -264,15 +264,17 @@ static void image_jacobian_translation_ECC_cuda(ECC_GPU_Buffers& gpuEccBuffers)
 {
 	const int w = gpuEccBuffers.src1.cols;
 	//compute Jacobian blocks (2 blocks)
-	gpuEccBuffers.src1.copyTo(gpuEccBuffers.dst.colRange(0, w));
-	gpuEccBuffers.src2.copyTo(gpuEccBuffers.dst.colRange(w, 2 * w));
-    cv::Mat gpuEccBuffersDstMat;
-    gpuEccBuffers.dst.download(gpuEccBuffersDstMat);
-    std::cout << "image_jacobian_translation_ECC_cuda dst.size: " << gpuEccBuffersDstMat.size() << std::endl;
+	gpuEccBuffers.src1.copyTo(gpuEccBuffers.dst.colRange(0, w)); // gpubuffers.gradientX
+	gpuEccBuffers.src2.copyTo(gpuEccBuffers.dst.colRange(w, 2 * w)); // gpubuffers.gradientY
 }
 
 static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda::GpuMat& src2, Mat& dst, ECC_GPU_Buffers& eccBuffers)
 {
+    // cuda::GpuMat& jacobianGPU = gpubuffers.dst; gpubuffers.gradientX, and gpubuffers.gradientY
+    //used 1: project_onto_jacobian_ECC_cuda(jacobianGPU, jacobianGPU, hessian, gpubuffers)
+    //used 2: project_onto_jacobian_ECC_cuda(jacobianGPU, gpubuffers.imageWarped, imageProjection, gpubuffers);
+    //used 3: project_onto_jacobian_ECC_cuda(jacobianGPU, gpubuffers.templateZM, templateProjection, gpubuffers);
+    //used 4: project_onto_jacobian_ECC_cuda(jacobianGPU, gpubuffers.error, errorProjection, gpubuffers);    
     // dst here is the Hessian
 	/* this functions is used for two types of projections. If src1.cols ==src.cols
 	it does a blockwise multiplication (like in the outer product of vectors)
@@ -325,7 +327,7 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
                 std::cout << "project_onto_jacobian_ECC_cuda-dotGpuMat-src1.cols == src2.cols" << '\n';
                 std::cout << "(i,j): (" << i << ", " << j << "), dst(Hessian).size: " << dst.size <<  ", src2.cols: " << src2.cols << std::endl;
 				dotGpuMat(src1.colRange(i*w, (i + 1)*w), src2.colRange(j*w, (j + 1)*w), i*dst.cols + j, eccBuffers);
-			}
+			} // gpubuffers.gradientX @ gpubuffers.gradientY, double *pDp_dev = &buffers.pDp_dev[0*464 +1], eccBuffers
 		}
 
 		cudaMemcpy(dotProdDoubles.data(), eccBuffers.pDp_dev, sizeof(double)*dst.rows*dst.cols, cudaMemcpyDeviceToHost);
@@ -594,7 +596,7 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         std::cout << "iteraion#: " << i << std::endl;
         // warp-back portion of the inputImage and gradients to the coordinate space of the templateImage
         if (motionType != MOTION_HOMOGRAPHY)
-        {
+        { // warping into 
 			cuda::warpAffine(gpubuffers.imageFloat, gpubuffers.imageWarped, map, gpubuffers.imageWarped.size(), imageFlags);
 			cuda::warpAffine(gpubuffers.gradientX, gpubuffers.src1, map, gpubuffers.src1.size(), imageFlags);
 			cuda::warpAffine(gpubuffers.gradientY, gpubuffers.src2, map, gpubuffers.src2.size(), imageFlags);
@@ -635,12 +637,11 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
                 image_jacobian_euclidean_ECC_cuda(map, gpubuffers);
                 break;
         }
-		cuda::GpuMat& jacobianGPU = gpubuffers.dst;
+		cuda::GpuMat& jacobianGPU = gpubuffers.dst; //gpubuffers.gradientX and gpubuffers.gradientY
         // calculate Hessian and its inverse
 		gpubuffers.stream.waitForCompletion();
-        std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n';
-        std::cout << "dst.size():\n" << dst.size() << std::endl;
 
+        std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n' << "dst.size(): " << dst.size() << std::endl;
 		project_onto_jacobian_ECC_cuda(jacobianGPU, jacobianGPU, hessian, gpubuffers);
         hessianInv = hessian.inv();
 		double correlation;
