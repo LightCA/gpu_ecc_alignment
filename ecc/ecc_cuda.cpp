@@ -293,6 +293,7 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 		std::vector<double> dotProdDoubles(dst.rows);
 		for (int i = 0; i < dst.rows; i++) {
             std::cout << "project_onto_jacobian_ECC_cuda-dotGpuMat src1.cols != src2.cols" << '\n';
+            std::cout << "i: " << i << ", dst.rows: " << dst.rows <<  ", src2.cols: " << src2.cols << std::endl;
 			dotGpuMat(src2, src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 		}
         
@@ -314,6 +315,7 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 			normL2GPUFloatMat(src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 			for (int j = i + 1; j < dst.cols; j++) { //j starts from i+1
                 std::cout << "project_onto_jacobian_ECC_cuda-dotGpuMat-src1.cols == src2.cols" << '\n';
+                std::cout << "i: " << i << ", dst.rows: " << dst.rows <<  ", src2.cols: " << src2.cols << std::endl;
 				dotGpuMat(src1.colRange(i*w, (i + 1)*w), src2.colRange(j*w, (j + 1)*w), i*dst.cols + j, eccBuffers);
 			}
 		}
@@ -407,8 +409,8 @@ static void update_warping_matrix_ECC (Mat& map_matrix, const Mat& update, const
 }
 
 
-double findTransformECCGpu_(InputArray templateImage,
-                            InputArray inputImage,
+double findTransformECCGpu_(InputArray templateImage, // to be warped
+                            InputArray inputImage, // target
                             InputOutputArray warpMatrix, 
                             int motionType,         // motion_mode
                             TermCriteria criteria,
@@ -417,8 +419,8 @@ double findTransformECCGpu_(InputArray templateImage,
 {
 
 
-    Mat src = templateImage.getMat();//template image
-    Mat dst = inputImage.getMat(); //input image (to be warped)
+    Mat src = templateImage.getMat();//template image (to be warped)
+    Mat dst = inputImage.getMat(); //input image 
     Mat map = warpMatrix.getMat(); //warp (transformation)
 
 
@@ -580,7 +582,7 @@ double findTransformECCGpu_(InputArray templateImage,
     double last_rho = - termination_eps;
     for (int i = 1; (i <= numberOfIterations) && (fabs(rho-last_rho)>= termination_eps); i++)
     {
-
+        std::cout << "i: " << i << std::endl;
         // warp-back portion of the inputImage and gradients to the coordinate space of the templateImage
         if (motionType != MOTION_HOMOGRAPHY)
         {
@@ -674,16 +676,16 @@ double findTransformECCGpu_(InputArray templateImage,
         // update warping matrix
         update_warping_matrix_ECC( map, deltaP, motionType);
 
+        std::cout << "map: \n" << map << std::endl;
 
     }
-
     // return final correlation coefficient
     return rho;
 }
 
 double findTransformECCGpu(
-    InputArray templateImage,   // template_image
-    InputArray inputImage,      // target_image
+    InputArray templateImage,   // template_image (to be warped)
+    InputArray inputImage,      // target_image (input)
     InputOutputArray warpMatrix,// warp_matrix
      int motionType,            // warp_mode
     TermCriteria criteria,      // TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, number_of_iterations, termination_eps)
