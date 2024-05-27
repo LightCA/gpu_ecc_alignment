@@ -40,7 +40,7 @@ struct ECC_GPU_Buffers
 		int w = size.width;
 		hatxsrc1.create(size, CV_32F);
 		hatysrc2.create(size, CV_32F);
-		dst.create(cv::Size(params*w,h), CV_32F);
+		dst.create(cv::Size(params*w,h), CV_32F); // for each param (trans->2, homo->8), we have a copy of matrix
 		den_.create(size,CV_32F);
 		hatX_.create(size, CV_32F);
 		hatY_.create(size, CV_32F);
@@ -53,7 +53,6 @@ struct ECC_GPU_Buffers
 		src3.create(size, CV_32F);
 		src4.create(size, CV_32F);
 		src5.create(size, CV_32F);
-
 
 		imageWarped.create(size, CV_32F);
 		imageProjection.create(size, CV_32F);
@@ -155,11 +154,10 @@ void dotGpuMat(cv::cuda::GpuMat m1, cv::cuda::GpuMat m2, int i, ECC_GPU_Buffers&
     std::cout << "temp_pDP: " << temp_pDP << '\n';
     cv::Mat cpuMat1;
     m1.download(cpuMat1);
-    cv::imshow("cpuMat1", cpuMat1);
+    cv::imwrite("cpuMat1.jpg", cpuMat1);
     cv::Mat cpuMat2;
     m2.download(cpuMat2);
-    cv::imshow("cpuMat2", cpuMat2);
-    // cv::waitKey(0);
+    cv::imwrite("cpuMat2.jpg", cpuMat2);
 }
 
 
@@ -167,14 +165,14 @@ static void image_jacobian_homo_ECC_cuda(const Mat& src5, ECC_GPU_Buffers& gpuEc
 {
 	const float* hptr = src5.ptr<float>(0);
 
-	const float h0_ = hptr[0];
-	const float h1_ = hptr[3];
-	const float h2_ = hptr[6];
-	const float h3_ = hptr[1];
-	const float h4_ = hptr[4];
-	const float h5_ = hptr[7];
-	const float h6_ = hptr[2];
-	const float h7_ = hptr[5];
+	const float h0_ = hptr[0]; // scale x
+	const float h1_ = hptr[3]; // shear y
+	const float h2_ = hptr[6]; // perspective x
+	const float h3_ = hptr[1]; // shear x
+	const float h4_ = hptr[4]; // scale y
+	const float h5_ = hptr[7]; // perspective y
+	const float h6_ = hptr[2]; // shift x
+	const float h7_ = hptr[5]; // shift y
 
 	const int w = gpuEccBuffers.src1.cols;
 
@@ -267,18 +265,21 @@ static void image_jacobian_translation_ECC_cuda(ECC_GPU_Buffers& gpuEccBuffers)
 	//compute Jacobian blocks (2 blocks)
 	gpuEccBuffers.src1.copyTo(gpuEccBuffers.dst.colRange(0, w));
 	gpuEccBuffers.src2.copyTo(gpuEccBuffers.dst.colRange(w, 2 * w));
-
+    cv::Mat gpuEccBuffersDstMat;
+    gpuEccBuffers.dst.download(gpuEccBuffersDstMat);
+    std::cout << "image_jacobian_translation_ECC_cuda dst.size: " << gpuEccBuffersDstMat.size() << std::endl;
 }
 
 static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda::GpuMat& src2, Mat& dst, ECC_GPU_Buffers& eccBuffers)
 {
+    // dst here is the Hessian
 	/* this functions is used for two types of projections. If src1.cols ==src.cols
 	it does a blockwise multiplication (like in the outer product of vectors)
 	of the blocks in matrices src1 and src2 and dst
 	has size (number_of_blcks x number_of_blocks), otherwise dst is a vector of size
 	(number_of_blocks x 1) since src2 is "multiplied"(dot) with each block of src1.
 
-	The number_of_blocks is equal to the number of parameters we are lloking for
+	The number_of_blocks is equal to the number of parameters we are looking for
 	(i.e. rtanslation:2, euclidean: 3, affine: 6, homography: 8)
 
 	*/
@@ -293,7 +294,7 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 		std::vector<double> dotProdDoubles(dst.rows);
 		for (int i = 0; i < dst.rows; i++) {
             std::cout << "project_onto_jacobian_ECC_cuda-dotGpuMat src1.cols != src2.cols" << '\n';
-            std::cout << "i: " << i << ", dst.rows: " << dst.rows <<  ", src2.cols: " << src2.cols << std::endl;
+            std::cout << "i: " << i << ", dst(Hessian).rows: " << dst.rows <<  ", src2.cols: " << src2.cols << std::endl;
 			dotGpuMat(src2, src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 		}
         
@@ -310,7 +311,13 @@ static void project_onto_jacobian_ECC_cuda(const cuda::GpuMat& src1, const cuda:
 		w = src2.cols / dst.cols;
 		std::vector<double> dotProdDoubles(dst.rows*dst.cols);
 		std::vector<double> normDoubles(dst.rows);
-		
+        cv::Mat src1Mat;
+        src1.download(src1Mat);
+        cv::Mat src2Mat;
+        src2.download(src2Mat);
+		std::cout << "src1.size: " << src1Mat.size() << std::endl;
+		std::cout << "src2.size: " << src2Mat.size() << std::endl;
+
 		for (int i = 0; i < dst.rows; i++) {
 			normL2GPUFloatMat(src1.colRange(i*w, (i + 1)*w),i, eccBuffers);
 			for (int j = i + 1; j < dst.cols; j++) { //j starts from i+1
@@ -459,7 +466,7 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
     }
 
     CV_Assert (criteria.type & TermCriteria::COUNT || criteria.type & TermCriteria::EPS);
-    const int    numberOfIterations = (criteria.type & TermCriteria::COUNT) ? criteria.maxCount : 200;
+    const int    numberOfIterations = (criteria.type & TermCriteria::COUNT) ? criteria.maxCount : 200; // if given, then maxCount, else 200
     const double termination_eps    = (criteria.type & TermCriteria::EPS)   ? criteria.epsilon  :  -1;
 
     int paramTemp = 8;
@@ -478,6 +485,7 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
           break;
     }
 
+    std::cout << "ECC_GPU_Buffers(cv::Size.. src.size(): " << src.size() << std::endl;
 	auto gpubuffers = ECC_GPU_Buffers(cv::Size(src.cols, src.rows), paramTemp);
 
     const int numberOfParameters = paramTemp;
@@ -579,10 +587,10 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
 
     // iteratively update map_matrix
     double rho      = -1;
-    double last_rho = - termination_eps;
-    for (int i = 1; (i <= numberOfIterations) && (fabs(rho-last_rho)>= termination_eps); i++)
+    double last_rho = - termination_eps; // eg -0.001
+    for (int i = 1; (i <= numberOfIterations) && (fabs(rho-last_rho)>= termination_eps); i++) // abs(-1-(-0.001)) = 0.999 >=0.001
     {
-        std::cout << "i: " << i << std::endl;
+        std::cout << "iteraion#: " << i << std::endl;
         // warp-back portion of the inputImage and gradients to the coordinate space of the templateImage
         if (motionType != MOTION_HOMOGRAPHY)
         {
@@ -630,6 +638,8 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         // calculate Hessian and its inverse
 		gpubuffers.stream.waitForCompletion();
         std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n';
+        std::cout << "dst.size():\n" << dst.size() << std::endl;
+
 		project_onto_jacobian_ECC_cuda(jacobianGPU, jacobianGPU, hessian, gpubuffers);
         hessianInv = hessian.inv();
 		double correlation;
@@ -637,11 +647,13 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         std::cout << "findTransformECCGpu_" << '\n';
 		dotGpuMat(gpubuffers.templateZM, gpubuffers.imageWarped,0, gpubuffers); //templateZM.dot(imageWarped);
 		cudaMemcpy(&correlation, gpubuffers.pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
-        std::cout << '\n' << "correlation: " << correlation << "\n";
 		 
         // calculate enhanced correlation coefficient (ECC)->rho
         last_rho = rho;
         rho = correlation/(imgNorm*tmpNorm);
+        std::cout << "imgNorm: " << imgNorm << std::endl;
+        std::cout << "correlation: " << correlation << std::endl;
+        std::cout << "rho: " << rho << std::endl;
         if (cvIsNaN(rho)) {
           CV_Error(Error::StsNoConv, "NaN encountered.");
         }

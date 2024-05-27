@@ -209,8 +209,9 @@ int main(const int argc, const char * argv[])
 		Mat warpGround;
 		RNG rng(getTickCount());
 		double angle;
-		int shiftX = 70; // 67
-		int shiftY = 70; // 38
+		int shiftX = 10; // 67
+		int shiftY = 10; // 38
+		std::cout << "\nshiftX, shiftY: " << shiftX << ", " << shiftY << endl;
 		switch (mode_temp) {
 		case MOTION_TRANSLATION:
 			angle = 0;
@@ -264,11 +265,10 @@ int main(const int argc, const char * argv[])
 			break;
 		}
 	}
-
-	cv::imshow("template (will be warped)", template_image); // created from input shifted if not given
-    cv::imshow("target_image (input)", target_image); // input
-    cv::waitKey(0);
-
+	std::cout << "saving images in build" << endl;
+	cv::imwrite("template (will be warped).jpg", template_image); // created from input shifted if not given
+    cv::imwrite("target_image (input).jpg", target_image); // input
+	std::cout << "finished saving images in build" << endl;
 
 	const int warp_mode = mode_temp;
 
@@ -383,14 +383,19 @@ int main(const int argc, const char * argv[])
 		minMaxLoc(errorImage, NULL, &max_of_error);
 		// show images
 		cout << "Press any key to exit the demo (you might need to click on the images before)." << endl << flush;
-		imshow("image", target_image);
-		waitKey(200);
-		imshow("template", template_image);
-		waitKey(200);
-		imshow("warped image", warped_image);
-		waitKey(200);
-		imshow("error (black: no error)", abs(errorImage) * 255 / max_of_error);
-		waitKey(0);
+		// imshow("image", target_image);
+		// waitKey(200);
+		// imshow("template", template_image);
+		// waitKey(200);
+		// imshow("warped image", warped_image);
+		// waitKey(200);
+		// imshow("error (black: no error)", abs(errorImage) * 255 / max_of_error);
+		// waitKey(0);
+
+		imwrite("image", target_image);
+		imwrite("template", template_image);
+		imwrite("warped image", warped_image);
+		imwrite("error (black: no error)", abs(errorImage) * 255 / max_of_error);
 	}
 	// done
 	return 0;
