@@ -629,10 +629,19 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         // warp-back portion of the inputImage and gradients to the coordinate space of the templateImage
         if (motionType != MOTION_HOMOGRAPHY)
         { // warping into 
+
 			cuda::warpAffine(gpubuffers.imageFloat, gpubuffers.imageWarped, map, gpubuffers.imageWarped.size(), imageFlags);
 			cuda::warpAffine(gpubuffers.gradientX, gpubuffers.src1, map, gpubuffers.src1.size(), imageFlags);
 			cuda::warpAffine(gpubuffers.gradientY, gpubuffers.src2, map, gpubuffers.src2.size(), imageFlags);
 			cuda::warpAffine(gpubuffers.preMask, gpubuffers.imageMask, map, gpubuffers.imageMask.size(), maskFlags);
+
+            cv::Mat imageWarpedMat, src1Mat, imageMaskMat;
+            gpubuffers.imageWarped.download(imageWarpedMat);
+            gpubuffers.src1.download(src1Mat);
+            gpubuffers.imageMask.download(imageMaskMat);
+            cv::imwrite("imageWarped.jpg", imageWarpedMat);
+            cv::imwrite("src1.jpg", src1Mat);
+            cv::imwrite("imageMask.jpg", imageMaskMat);
 
         }
         else
@@ -647,11 +656,12 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         double imgMean, imgStd;
 		double tmpMean, tmpStd;
 		meanStdDev_32FC1M(gpubuffers.templateFloat, gpubuffers.imageMask, &tmpMean, &tmpStd, gpubuffers);
+        std::cout << "tmpMean: " << tmpMean << ", tmpStd: "  << tmpStd  << std::endl;
 		meanStdDev_32FC1M(gpubuffers.imageWarped, gpubuffers.imageMask, &imgMean, &imgStd, gpubuffers);
+        std::cout << "imgMean: " << imgMean << ", imgStd: "  << imgStd  << std::endl;
+
         cuda::subtract(gpubuffers.imageWarped,   imgMean, gpubuffers.imageWarped, gpubuffers.imageMask);//zero-mean input
         cuda::subtract(gpubuffers.templateFloat, tmpMean, gpubuffers.templateZM, gpubuffers.imageMask);//zero-mean template
-        
-        std::cout << "tmpStd: " << tmpStd << ", imgStd: "  << imgStd  << std::endl;
 
         const double tmpNorm = std::sqrt(cuda::countNonZero(gpubuffers.imageMask)*(tmpStd)*(tmpStd));
         const double imgNorm = std::sqrt(cuda::countNonZero(gpubuffers.imageMask)*(imgStd)*(imgStd));

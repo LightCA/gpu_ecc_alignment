@@ -209,7 +209,7 @@ int main(const int argc, const char * argv[])
 		Mat warpGround;
 		RNG rng(getTickCount());
 		double angle;
-		int shiftX = 10; // 67
+		int shiftX = 50; // 67
 		int shiftY = 10; // 38
 		std::cout << "\nshiftX, shiftY: " << shiftX << ", " << shiftY << endl;
 		switch (mode_temp) {
@@ -392,10 +392,10 @@ int main(const int argc, const char * argv[])
 		// imshow("error (black: no error)", abs(errorImage) * 255 / max_of_error);
 		// waitKey(0);
 
-		imwrite("image", target_image);
+		imwrite("image.jpg", target_image);
 		imwrite("template", template_image);
-		imwrite("warped image", warped_image);
-		imwrite("error (black: no error)", abs(errorImage) * 255 / max_of_error);
+		imwrite("warped_image.jpg", warped_image);
+		imwrite("error__black_means_no_error.jpg", abs(errorImage) * 255 / max_of_error);
 	}
 	// done
 	return 0;
