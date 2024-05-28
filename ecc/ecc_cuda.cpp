@@ -13,6 +13,7 @@
 #include <opencv2/cudaarithm.hpp>
 #include <iostream>
 
+
 /****************************************************************************************\
 *                                      Cuda Image Alignment (ECC algorithm)                  *
 \****************************************************************************************/
@@ -128,38 +129,69 @@ void meanStdDev_32FC1M(cv::cuda::GpuMat src, cv::cuda::GpuMat mask, double *mean
 	cudaMemcpy(mean, buffers.mean_dev, sizeof(double), cudaMemcpyDeviceToHost);
 	cudaMemcpy(stddev, buffers.stddev_dev, sizeof(double), cudaMemcpyDeviceToHost);
 }
+#define CUDA_CHECK(call)                                                   \
+do {                                                                       \
+    cudaError_t err = call;                                                \
+    if (cudaSuccess != err) {                                              \
+        std::cerr << "CUDA error in " << __FILE__ << " at line " << __LINE__; \
+        std::cerr << ": " << cudaGetErrorString(err) << std::endl;         \
+        /* std::exit(EXIT_FAILURE); */                                           \
+    }                                                                      \
+} while (0)
+
+#define NPP_CHECK(call)                                                    \
+do {                                                                       \
+    NppStatus err = call;                                                  \
+    if (NPP_SUCCESS != err) {                                              \
+        std::cerr << "NPP error in " << __FILE__ << " at line " << __LINE__; \
+        std::cerr << ": " << err << std::endl;                             \
+        /* std::exit(EXIT_FAILURE); */                                         \
+    }                                                                      \
+} while (0)
 
 void dotGpuMat(cv::cuda::GpuMat m1, cv::cuda::GpuMat m2, int i, ECC_GPU_Buffers& buffers)
 {
-	NppiSize ns;
-	double *pDp_dev = &buffers.pDp_dev[i];
+    // buffers.stream = cv::cuda::Stream(); // Create a CUDA stream
+
+    NppiSize ns;
+    double *pDp_dev = &buffers.pDp_dev[i];
 
     double temp_pDP;
-    cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "temp_pDP: " << temp_pDP << '\n';
+    CUDA_CHECK(cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost));
+    // std::cout << "Initial temp_pDP: " << temp_pDP << '\n';
 
-	ns.height = m1.rows;
-	ns.width = m1.cols;
-    // - pSrc1: Pointer to the first input array (vector)
-    // - src1Step: Step size of the first input array
-    // - pSrc2: Pointer to the second input array (vector)
-    // - src2Step: Step size of the second input array
-    // - roiSize: Size of the region of interest (ROI), specifying the length of the vectors
-    // - pDst: Pointer to the output array to store the dot product result
-    // - pBuffer: Temporary buffer for the operation
+    ns.height = m1.rows;
+    ns.width = m1.cols;
 
-	nppiDotProd_32f64f_C1R(m1.ptr<Npp32f>(), static_cast<int>(m1.step), m2.ptr<Npp32f>(), static_cast<int>(m2.step), ns, pDp_dev, buffers.pDeviceBuffer);
-    
-    cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "temp_pDP: " << temp_pDP << '\n';
-    cv::Mat cpuMat1;
-    m1.download(cpuMat1);
-    cv::imwrite("cpuMat1.jpg", cpuMat1);
-    cv::Mat cpuMat2;
-    m2.download(cpuMat2);
-    cv::imwrite("cpuMat2.jpg", cpuMat2);
+    // Download matrices to CPU for comparison
+    cv::Mat mat1, mat2;
+    m1.download(mat1);
+    m2.download(mat2);
 
+    // Calculate dot product on CPU for comparison
+    double cpu_dot_product = mat1.dot(mat2);
+
+    // Calculate dot product on GPU
+    NPP_CHECK(nppiDotProd_32f64f_C1R(m1.ptr<Npp32f>(), static_cast<int>(m1.step), m2.ptr<Npp32f>(), static_cast<int>(m2.step), ns, pDp_dev, buffers.pDeviceBuffer));
+
+    CUDA_CHECK(cudaMemcpy(&temp_pDP, pDp_dev, sizeof(double), cudaMemcpyDeviceToHost));
+
+    if (temp_pDP == 0) {
+        std::cout << "Override GPU dot product (==0) with CPU Dot product: " << cpu_dot_product << std::endl;
+        temp_pDP = cpu_dot_product;
+        CUDA_CHECK(cudaMemcpy(pDp_dev, &temp_pDP, sizeof(double), cudaMemcpyHostToDevice));
+    }
+
+    // // Save the matrices to disk for debugging
+    // m1.download(mat1);
+    // m2.download(mat2);
+    // cv::imwrite("cpuMat1.jpg", mat1);
+    // cv::imwrite("cpuMat2.jpg", mat2);
+
+    // buffers.stream.waitForCompletion();
 }
+
+
 
 
 static void image_jacobian_homo_ECC_cuda(const Mat& src5, ECC_GPU_Buffers& gpuEccBuffers)
@@ -618,9 +650,13 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
 		meanStdDev_32FC1M(gpubuffers.imageWarped, gpubuffers.imageMask, &imgMean, &imgStd, gpubuffers);
         cuda::subtract(gpubuffers.imageWarped,   imgMean, gpubuffers.imageWarped, gpubuffers.imageMask);//zero-mean input
         cuda::subtract(gpubuffers.templateFloat, tmpMean, gpubuffers.templateZM, gpubuffers.imageMask);//zero-mean template
-		
+        
+        std::cout << "tmpStd: " << tmpStd << ", imgStd: "  << imgStd  << std::endl;
+
         const double tmpNorm = std::sqrt(cuda::countNonZero(gpubuffers.imageMask)*(tmpStd)*(tmpStd));
         const double imgNorm = std::sqrt(cuda::countNonZero(gpubuffers.imageMask)*(imgStd)*(imgStd));
+
+        std::cout << "tmpNorm: " << tmpNorm << ", imgNorm: "  << imgNorm  << std::endl;
 
         // calculate jacobian of image wrt parameters
         switch (motionType){
@@ -641,7 +677,9 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         // calculate Hessian and its inverse
 		gpubuffers.stream.waitForCompletion();
 
-        std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n' << "dst.size(): " << dst.size() << std::endl;
+        std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n' << "inputImage size(): " << dst.size() << std::endl;
+        std::cout << "project_onto_jacobian_ECC_cuda (hessian): " << '\n' << "gpubuffers.dst: "    << gpubuffers.dst.size() << std::endl;
+
 		project_onto_jacobian_ECC_cuda(jacobianGPU, jacobianGPU, hessian, gpubuffers);
         hessianInv = hessian.inv();
 		double correlation;
@@ -653,7 +691,7 @@ double findTransformECCGpu_(InputArray templateImage, // to be warped
         // calculate enhanced correlation coefficient (ECC)->rho
         last_rho = rho;
         rho = correlation/(imgNorm*tmpNorm);
-        std::cout << "imgNorm: " << imgNorm << std::endl;
+
         std::cout << "correlation: " << correlation << std::endl;
         std::cout << "rho: " << rho << std::endl;
         if (cvIsNaN(rho)) {
