@@ -383,17 +383,17 @@ int main(const int argc, const char * argv[])
 		minMaxLoc(errorImage, NULL, &max_of_error);
 		// show images
 		cout << "Press any key to exit the demo (you might need to click on the images before)." << endl << flush;
-		// imshow("image", target_image);
-		// waitKey(200);
-		// imshow("template", template_image);
-		// waitKey(200);
-		// imshow("warped image", warped_image);
-		// waitKey(200);
-		// imshow("error (black: no error)", abs(errorImage) * 255 / max_of_error);
+		imshow("image", target_image);
+		waitKey(200);
+		imshow("template", template_image);
+		waitKey(200);
+		imshow("warped image", warped_image);
+		waitKey(200);
+		imshow("error (black: no error)", abs(errorImage) * 255 / max_of_error);
 		// waitKey(0);
-
+		cout << "\nsaving images" << endl;
 		imwrite("image.jpg", target_image);
-		imwrite("template", template_image);
+		imwrite("template.jpg", template_image);
 		imwrite("warped_image.jpg", warped_image);
 		imwrite("error__black_means_no_error.jpg", abs(errorImage) * 255 / max_of_error);
 	}
