@@ -204,20 +204,22 @@ int main(const int argc, const char * argv[])
 	// else: template_image (the image to warp towards) is not given so we resize inputImage into target_image
 	else { // apply warp to input image
 
-		Size out_shape(inputImage.size()); // 1920, 2560
+		// Size out_shape(inputImage.size()); // 1920, 2560
+		Size out_shape(1200, 900); // 1920, 2560
+		resize(inputImage, target_image, out_shape, 0, 0, INTER_LINEAR_EXACT);
 
 		Mat warpGround;
 		RNG rng(getTickCount());
 		double angle;
-		int shiftX = 50; // 67
-		int shiftY = 10; // 38
+		int shiftX = 100; // 67
+		int shiftY = 50; // 38
 		std::cout << "\nshiftX, shiftY: " << shiftX << ", " << shiftY << endl;
 		switch (mode_temp) {
 		case MOTION_TRANSLATION:
 			angle = 0;
 			warpGround = (Mat_<float>(2, 3) <<  cos(angle), -sin(angle), shiftX,
 												sin(angle),  cos(angle), shiftY);
-			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
+			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR);
 
 			//warpGround = (Mat_<float>(2, 3) << 1, 0, (rng.uniform(10.f, 20.f)),
 			//	0, 1, (rng.uniform(10.f, 20.f)));
@@ -228,7 +230,7 @@ int main(const int argc, const char * argv[])
 			angle = 0;//CV_PI*11/180.f;
 			warpGround = (Mat_<float>(2, 3) <<  cos(angle), -sin(angle), shiftX,
 												sin(angle),  cos(angle), shiftY);
-			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
+			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR);
 
 			//angle = CV_PI / 30 + CV_PI*rng.uniform((double)-2.f, (double)2.f) / 180;
 			//warpGround = (Mat_<float>(2, 3) << cos(angle), -sin(angle), (rng.uniform(10.f, 20.f)),
@@ -240,7 +242,7 @@ int main(const int argc, const char * argv[])
 			angle = 0;// CV_PI * 11 / 180.f;
 			warpGround = (Mat_<float>(2, 3) <<  cos(angle), -sin(angle), shiftX,
 												sin(angle),  cos(angle), shiftY);
-			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
+			warpAffine(target_image, template_image, warpGround, out_shape, INTER_LINEAR);
 
 			//warpGround = (Mat_<float>(2, 3) << (1 - rng.uniform(-0.05f, 0.05f)),
 			//	(rng.uniform(-0.03f, 0.03f)), (rng.uniform(10.f, 20.f)),
@@ -258,7 +260,7 @@ int main(const int argc, const char * argv[])
 				(rng.uniform(-0.01f, 0.01f)), (rng.uniform(10.f, 20.f)),
 				(rng.uniform(-0.01f, 0.01f)), (1 - rng.uniform(-0.01f, 0.01f)), (rng.uniform(10.f, 20.f)),
 				(rng.uniform(0.0001f, 0.0003f)), (rng.uniform(0.0001f, 0.0003f)), 1.f);
-			warpPerspective(target_image, template_image, warpGround, out_shape, INTER_LINEAR + WARP_INVERSE_MAP);
+			warpPerspective(target_image, template_image, warpGround, out_shape, INTER_LINEAR);
 			//warpPerspective(target_image, template_image, warpGround,
 			//	Size(200, 200), INTER_LINEAR + WARP_INVERSE_MAP);
 
@@ -390,7 +392,7 @@ int main(const int argc, const char * argv[])
 		imshow("warped image", warped_image);
 		waitKey(200);
 		imshow("error (black: no error)", abs(errorImage) * 255 / max_of_error);
-		// waitKey(0);
+		waitKey(0);
 		cout << "\nsaving images" << endl;
 		imwrite("image.jpg", target_image);
 		imwrite("template.jpg", template_image);

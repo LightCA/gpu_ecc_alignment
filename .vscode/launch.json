@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/ecc_gpu",
-            "args": ["-m=translation"], // ,"../img1.jpg",  "../img2.png"
+            "args": ["-m=homograpy"], // ,"../img1.jpg",  "../img2.png"
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
