@@ -3,3 +3,5 @@ x64/
 .vs/*
 build/
 settings.json
+*.sln
+/gpu_ecc_alignment_vs19
