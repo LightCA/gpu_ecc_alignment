@@ -205,7 +205,8 @@ int main(const int argc, const char * argv[])
 	else { // apply warp to input image
 
 		// Size out_shape(inputImage.size()); // 1920, 2560
-		Size out_shape(1200, 900); // 1920, 2560
+		//Size out_shape(1200, 900); // 1920, 2560
+		Size out_shape(1920, 2560); // 1920, 2560
 		resize(inputImage, target_image, out_shape, 0, 0, INTER_LINEAR_EXACT);
 
 		Mat warpGround;
