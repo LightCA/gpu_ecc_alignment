@@ -31,12 +31,12 @@ static int readWarp(string iFilename, Mat& warp, int motionType);
 static int saveWarp(string fileName, const Mat& warp, int motionType);
 static void draw_warped_roi(Mat& image, const int width, const int height, Mat& W);
 #define HOMO_VECTOR(H, x, y)\
-    H.at<float>(0,0) = (float)(x);\
-    H.at<float>(1,0) = (float)(y);\
-    H.at<float>(2,0) = 1.;
+	H.at<float>(0,0) = (float)(x);\
+	H.at<float>(1,0) = (float)(y);\
+	H.at<float>(2,0) = 1.;
 #define GET_HOMO_VALUES(X, x, y)\
-    (x) = static_cast<float> (X.at<float>(0,0)/X.at<float>(2,0));\
-    (y) = static_cast<float> (X.at<float>(1,0)/X.at<float>(2,0));
+	(x) = static_cast<float> (X.at<float>(0,0)/X.at<float>(2,0));\
+	(y) = static_cast<float> (X.at<float>(1,0)/X.at<float>(2,0));
 const std::string keys =
 "{@inputImage    | fruits.jpg    | input image filename }"
 "{@templateImage |               | template image filename (optional)}"
@@ -270,7 +270,7 @@ int main(const int argc, const char * argv[])
 	}
 	std::cout << "saving images in build" << endl;
 	cv::imwrite("template (will be warped).jpg", template_image); // created from input shifted if not given
-    cv::imwrite("target_image (input).jpg", target_image); // input
+	cv::imwrite("target_image (input).jpg", target_image); // input
 	std::cout << "finished saving images in build" << endl;
 
 	const int warp_mode = mode_temp;

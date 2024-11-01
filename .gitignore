@@ -4,4 +4,4 @@ x64/
 build/
 settings.json
 *.sln
-/gpu_ecc_alignment_vs19
+/gpu_ecc_alignment
