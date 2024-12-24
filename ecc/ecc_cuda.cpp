@@ -164,8 +164,8 @@ static void image_jacobian_homo_ECC_cuda(const Mat& src5, ECC_GPU_Buffers& gpuEc
 
 	//compute Jacobian blocks (8 blocks)
 
-	cuda::GpuMat& src1Divided_ = gpuEccBuffers.dst.colRange(6 * w, 7 * w);
-	cuda::GpuMat& src2Divided_ = gpuEccBuffers.dst.colRange(7 * w, 8 * w);
+	cuda::GpuMat src1Divided_ = gpuEccBuffers.dst.colRange(6 * w, 7 * w);
+	cuda::GpuMat src2Divided_ = gpuEccBuffers.dst.colRange(7 * w, 8 * w);
 	
 	cuda::multiply(src1Divided_, gpuEccBuffers.src3, gpuEccBuffers.dst.colRange(0, w), 1.0, CV_32F, gpuEccBuffers.stream);
 
