@@ -176,10 +176,13 @@ static void image_jacobian_homo_ECC_cuda(const Mat& src5, ECC_GPU_Buffers& gpuEc
 
 	cuda::divide(gpuEccBuffers.hatY_, gpuEccBuffers.den_, gpuEccBuffers.hatY_,1.0,CV_32F, gpuEccBuffers.stream);
 
+
 	//instead of dividing each block with den,
 	//just pre-divide the block of gradients (it's more efficient)
 	cuda::divide(gpuEccBuffers.src1, gpuEccBuffers.den_, gpuEccBuffers.dst.colRange(6 * w, 7 * w), 1.0,CV_32F, gpuEccBuffers.stream);
 	cuda::divide(gpuEccBuffers.src2, gpuEccBuffers.den_, gpuEccBuffers.dst.colRange(7 * w, 8 * w), 1.0, CV_32F, gpuEccBuffers.stream);
+
+	
 
 	//compute Jacobian blocks (8 blocks)
 	cuda::GpuMat src1Divided_ = gpuEccBuffers.dst.colRange(6 * w, 7 * w);
@@ -188,6 +191,7 @@ static void image_jacobian_homo_ECC_cuda(const Mat& src5, ECC_GPU_Buffers& gpuEc
 	cuda::multiply(src1Divided_, gpuEccBuffers.src3, gpuEccBuffers.dst.colRange(0, w), 1.0, CV_32F, gpuEccBuffers.stream);
 
 	cuda::multiply(src2Divided_, gpuEccBuffers.src3, gpuEccBuffers.dst.colRange(w, 2 * w), 1.0, CV_32F, gpuEccBuffers.stream);
+
 	
 	cuda::multiply(gpuEccBuffers.hatX_, src1Divided_, gpuEccBuffers.hatxsrc1, 1.0, CV_32F, gpuEccBuffers.stream);
 	cuda::multiply(gpuEccBuffers.hatY_, src2Divided_, gpuEccBuffers.hatysrc2, 1.0, CV_32F, gpuEccBuffers.stream);
