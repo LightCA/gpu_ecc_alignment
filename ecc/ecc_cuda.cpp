@@ -78,7 +78,7 @@ struct ECC_GPU_Buffers
 		cudaMalloc((void**)&pDp_dev, sizeof(double)*params*params);
 		cudaMalloc((void**)&mean_dev, sizeof(double));
 		cudaMalloc((void**)&stddev_dev, sizeof(double));
-		int hpBufferSize;
+		size_t hpBufferSize;
 		NppiSize ns;
 		ns.height = h;
 		ns.width = w;
